@@ -1,3 +1,4 @@
+from math import floor
 from re import L
 import numpy as np
 n, u, v = np.array([int(i) for i in input().split(' ')])
@@ -100,7 +101,9 @@ elif(u == 0):
 class simplex_method():
     def __init__(self, A, b, c, n, u, v):
         self.A = A
+        self.A_init = A.copy()
         self.b = b
+        self.b_init = b.copy()
         self.c = c
         self.n = n
         self.u = u
@@ -108,7 +111,7 @@ class simplex_method():
         self.v = v
         self.c_hat = None
         pass
-    def phase_1(self):
+    def gomory_phase_1(self):
         self.c_hat = np.array([0 for i in range(self.n+self.u)] + [-1, 0]*v).astype(np.float64)
         c_hat = self.c_hat
         A_hat = self.A
@@ -156,7 +159,7 @@ class simplex_method():
     
 
 
-    def phase_2(self, basis, A_hat, b):
+    def gomory_phase_2(self, basis, A_hat, b):
         # removing the artificial variables
         A_hat = np.delete(A_hat, [self.n+self.u+2*i for i in range(self.v)], axis = 1) 
         self.c = np.delete(c, [self.n+self.u+2*i for i in range(self.v)])
@@ -209,12 +212,31 @@ class simplex_method():
         for i in range(len(basis)):
             solution[basis[i]] = b[i]
         solution = np.array(solution)
-        print("{:.7f}".format(np.dot(solution, self.c_init)))
-        for i in range(self.n):
-            print("{:.7f}".format(solution[i]), end = " ")
+        int_sol = np.array([int(solution[i]) for i in range(len(solution))])
+        if(np.all(int_sol == solution)):
+            print("{:.7f}".format(np.dot(solution, self.c_init)))
+            for i in range(self.n):
+                print("{:.7f}".format(solution[i]), end = " ")
+        else:
+            for i in range(len(A_hat)):
+                int_con = np.array([int(A_hat[i][j]) for j in range(len(A_hat[i]))])
+                if(np.all(int_con == A_hat[i])):
+                    continue
+                else:
+                    new_con = np.array([floor(A_hat[i][j]) for j in range(len(A_hat[i]))])
+                    A_hat = np.append(A_hat, [new_con], axis = 0)
+                    temp_ar = np.array([[0] for i in range(A_hat.shape[0])])
+                    temp_ar[-1] = [1]
+                    A_hat = np.append(A_hat, temp_ar, axis = 1)
+                    basis = np.append(basis, [A_hat.shape[1]-1])
+                    b = np.append(b, [floor(b[i])])
+                    c_new = np.append(c_new, [0])
+                    break
+            # self.gomory_phase_2(basis, A_hat, b)
+            pass
 
 
-    def temp_phase_2(self, basis, A_hat, b):
+    def gomory_temp_phase_2(self, basis, A_hat, b):
         # removing the artificial variables
         
         A_hat = np.delete(A_hat, [self.n+self.u+2*i for i in range(self.v)], axis = 1) 
@@ -231,7 +253,9 @@ class simplex_method():
         cycling = 0
         while True:
             if(np.all(c_new <= 0)):
+                # print(c_new)
                 break
+            # j = np.argmin([c_new[i] if c_new[i] > 0 else np.inf for i in range(c_new.shape[0])])
             j = np.argmax(c_new)
             if(cycling == 1):
                 j = np.min(np.where(self.c < 0))
@@ -266,11 +290,46 @@ class simplex_method():
         for i in range(len(basis)):
             solution[basis[i]] = b[i]
         solution = np.array(solution)
+        int_sol = np.array([int(solution[i]) for i in range(len(solution))])
+        if(np.all(int_sol == solution)):
+            print("{:.7f}".format(np.dot(solution, self.c_init)))
+            for i in range(self.n):
+                print("{:.7f}".format(solution[i]), end = " ")
+        else:
+            for i in range(len(A_hat)):
+                int_con = np.array([int(A_hat[i][j]) for j in range(len(A_hat[i]))])
+                if(np.all(int_con == A_hat[i])):
+                    continue
+                else:
+                    new_con = np.array([floor(A_hat[i][j]) for j in range(len(A_hat[i]))])
+                    A_hat = np.append(A_hat, [new_con], axis = 0)
+                    temp_ar = np.array([[0] for i in range(A_hat.shape[0])])
+                    temp_ar[-1] = [1]
+                    A_hat = np.append(A_hat, temp_ar, axis = 1)
+                    basis = np.append(basis, [A_hat.shape[1]-1])
+                    b = np.append(b, [floor(b[i])])
+                    c_new = np.append(c_new, [0])
+                    break
+            # print(A_hat, basis, b, c_new)
+            # Now We have to create a new constraint
+            pass
 
-        print("{:.7f}".format(np.dot(solution, self.c_init)))
-        for i in range(self.n):
-            print("{:.7f}".format(solution[i]), end = " ")
+    
 
+    def gomory_cut(self):
+        if(self.v != 0):
+            temp = self.gomory_phase_1()
+            if(temp != None):
+                solution, c_hat, basis, A_hat, b = temp
+                art_var = np.array([solution[self.n+self.u+2*i] for i in range(self.v)])
+                if(np.any(art_var > 1e-16)):
+                    print("Infeasible")
+                    return
+                if(np.dot(solution, c_hat) <= 1e-16):
+                    self.gomory_phase_2(basis, A_hat, b)
+        else:
+            basis = np.array([self.n+i for i in range(self.u)])
+            self.gomory_temp_phase_2(basis, self.A, self.b)
 
     def solve(self):
         if(self.v != 0):
@@ -293,4 +352,4 @@ class simplex_method():
         print(self.c)
 
 simp = simplex_method(A, b, c, n_init, u, v)
-simp.solve()
+simp.gomory_cut()
